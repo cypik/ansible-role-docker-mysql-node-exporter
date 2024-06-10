@@ -1,0 +1,100 @@
+---
+
+- name: Install dependencies
+  apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - software-properties-common
+    state: present
+    update_cache: yes
+
+- name: Add Docker GPG key
+  apt_key:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    state: present
+
+- name: Add Docker repository
+  apt_repository:
+    repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_facts['distribution_release'] }} stable"
+    state: present
+    filename: docker
+
+- name: Update package index
+  apt:
+    update_cache: yes
+
+- name: Install Docker
+  apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+    state: present
+    update_cache: yes
+
+- name: Create MySQL Exporter user
+  user:
+    name: mysql_exporter
+    system: yes
+    shell: /usr/sbin/nologin
+
+- name: Add users to Docker group
+  user:
+    name: "{{ item }}"
+    groups: docker
+    append: yes
+  with_items: "{{ docker_users }}"
+  notify: restart docker
+
+- name: Pull MySQL Docker image
+  docker_image:
+    name: mysql
+    tag: latest
+    source: pull
+
+- name: Deploy MySQL container
+  docker_container:
+    name: mysql
+    image: mysql:latest
+    state: started
+    restart_policy: always
+    env:
+      MYSQL_ROOT_PASSWORD: "{{ mysql_root_password }}"
+      MYSQL_DATABASE: "{{ mysql_database }}"
+      MYSQL_USER: "{{ mysql_user }}"
+      MYSQL_PASSWORD: "{{ mysql_password }}"
+    ports:
+      - "3306:3306"
+    volumes:
+      - /var/lib/mysql:/var/lib/mysql
+
+- name: Pull Node Exporter Docker image
+  docker_image:
+    name: prom/node-exporter
+    tag: latest
+    source: pull
+
+- name: Deploy Node Exporter container
+  docker_container:
+    name: node_exporter
+    image: prom/node-exporter:latest
+    state: started
+    restart_policy: always
+    ports:
+      - "{{ node_exporter_port }}:9100"
+
+- name: Ensure MySQL conf.d directory exists
+  file:
+    path: /etc/mysql/conf.d
+    state: directory
+    mode: 0755
+
+- name: Copy MySQL configuration file
+  template:
+    src: mysql.cnf.j2
+    dest: /etc/mysql/conf.d/mysql.cnf
+  notify: restart mysql
+
+

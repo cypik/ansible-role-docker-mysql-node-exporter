@@ -1,0 +1,17 @@
+---
+# defaults/main.yml
+
+# Docker
+docker_users: []
+
+# MySQL
+mysql_root_password: "root_password"
+mysql_database: "my_database"
+mysql_user: "my_user"
+mysql_password: "my_password"
+
+# Node Exporter
+node_exporter_port: 9100
+mysql_custom_config:
+  option1: value1
+  option2: value2
